@@ -8,32 +8,36 @@ int main(void)
     InitWindow(screenWidth, screenHeight, "isaac");
 
     float squareSize = 30;
-    Vector2 squarePosition = { (float)screenWidth/2, (float)screenHeight/2 };
-    Vector2 squareDimensions = { (float)squareSize, (float)squareSize };
+    Vector2 squarePosition = {(float)screenWidth / 2, (float)screenHeight / 2};
+    Vector2 squareDimensions = {(float)squareSize, (float)squareSize};
 
-    SetTargetFPS(60);               // Set our game to run at 60 frames-per-second
+    SetTargetFPS(60); // Set our game to run at 60 frames-per-second
 
     // Main game loop
-    while (!WindowShouldClose())    // Detect window close button or ESC key
+    while (!WindowShouldClose()) // Detect window close button or ESC key
     {
         // Update
-        if (IsKeyDown(KEY_RIGHT)) squarePosition.x += 2.0f;
-        if (IsKeyDown(KEY_LEFT)) squarePosition.x -= 2.0f;
-        if (IsKeyDown(KEY_UP)) squarePosition.y -= 2.0f;
-        if (IsKeyDown(KEY_DOWN)) squarePosition.y += 2.0f;
+        if (IsKeyDown(KEY_D))
+            squarePosition.x += 2.0f;
+        if (IsKeyDown(KEY_A))
+            squarePosition.x -= 2.0f;
+        if (IsKeyDown(KEY_W))
+            squarePosition.y -= 2.0f;
+        if (IsKeyDown(KEY_S))
+            squarePosition.y += 2.0f;
 
         // Draw
         BeginDrawing();
 
-            ClearBackground(RAYWHITE);
+        ClearBackground(RAYWHITE);
 
-            DrawText("move the ball with arrow keys", 10, 10, 20, DARKGRAY);
+        DrawText("move the ball with arrow keys", 10, 10, 20, DARKGRAY);
 
-            DrawRectangleV(squarePosition, squareDimensions, MAROON);
+        DrawRectangleV(squarePosition, squareDimensions, MAROON);
 
         EndDrawing();
     }
 
-    CloseWindow();        // Close window and OpenGL context
+    CloseWindow(); // Close window and OpenGL context
     return 0;
 }
