@@ -10,7 +10,6 @@ enum Direction {
 struct Tear
 {
     Vector2 tearPosition;
-    Vector2 tearDimensions;
     enum Direction tearDirection;
 };
 
@@ -28,9 +27,13 @@ int main(void)
     Vector2 squarePosition = {(float)screenWidth / 2, (float)screenHeight / 2};
     Vector2 squareDimensions = {(float)squareSize, (float)squareSize};
 
-    SetTargetFPS(60); // Set our game to run at 60 frames-per-second
+    float tearRadius = squareSize / 2;
 
-    Tear spawnedTears;
+    struct Tear *spawnedTears = MemAlloc(sizeof(struct Tear)*1000);
+
+    unsigned int tearIndex = 0;
+
+    SetTargetFPS(60); // Set our game to run at 60 frames-per-second
 
     // Main game loop
     while (!WindowShouldClose()) // Detect window close button or ESC key
@@ -45,7 +48,15 @@ int main(void)
         if (IsKeyDown(KEY_S))
             squarePosition.y += 2.0f;
 
+
+        float tearOffset = 5.0f;
         if (IsKeyDown(KEY_RIGHT))
+        {
+            Vector2 tearPosition = { squarePosition.x + tearOffset, squarePosition.y };
+            (spawnedTears + tearIndex * sizeof(struct Tear))->tearPosition = tearPosition;
+            (spawnedTears + tearIndex * sizeof(struct Tear))->tearDirection = RIGHT;
+            ++tearIndex;
+        }
             // spawn tear to the right
         if (IsKeyDown(KEY_LEFT))
             // spawn tear to the left
@@ -62,6 +73,9 @@ int main(void)
         DrawText("move the square with wasd", 10, 10, 20, RAYWHITE);
 
         DrawRectangleV(squarePosition, squareDimensions, SKIN);
+
+        for (unsigned int i = 0; i < tearIndex; ++i)
+            DrawCircleV((spawnedTears + i * sizeof(struct Tear))->tearPosition, tearRadius, BLUE);
 
         EndDrawing();
     }
