@@ -31,7 +31,7 @@ int main(void)
 
         ClearBackground(RAYWHITE);
 
-        DrawText("move the ball with arrow keys", 10, 10, 20, DARKGRAY);
+        DrawText("move the square with wasd", 10, 10, 20, DARKGRAY);
 
         DrawRectangleV(squarePosition, squareDimensions, MAROON);
 
