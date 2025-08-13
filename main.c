@@ -1,5 +1,8 @@
 #include "raylib.h"
 
+Color SKIN =  { 255, 215, 156, 255 };
+Color BACKGROUND = { 84, 53, 30, 255 };
+
 int main(void)
 {
     const int screenWidth = 800;
@@ -29,11 +32,11 @@ int main(void)
         // Draw
         BeginDrawing();
 
-        ClearBackground(RAYWHITE);
+        ClearBackground(BACKGROUND);
 
-        DrawText("move the square with wasd", 10, 10, 20, DARKGRAY);
+        DrawText("move the square with wasd", 10, 10, 20, RAYWHITE);
 
-        DrawRectangleV(squarePosition, squareDimensions, MAROON);
+        DrawRectangleV(squarePosition, squareDimensions, SKIN);
 
         EndDrawing();
     }
