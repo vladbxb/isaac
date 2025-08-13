@@ -4,3 +4,4 @@
 ```sh
 gcc main.c -o bin/main -lraylib -lm -ldl -lpthread -lGL -lX11
 ```
+And run with bin/main .
