@@ -121,6 +121,7 @@ int main(void)
         ClearBackground(BACKGROUND);
 
         DrawText("Move the square with WASD", 10, 10, 20, RAYWHITE);
+        DrawText("Shoot tears with arrow keys", 10, 40, 20, RAYWHITE);
         DrawRectangleV(squarePosition, squareDimensions, SKIN);
 
         for (unsigned int i = 0; i < tearIndex; ++i)
