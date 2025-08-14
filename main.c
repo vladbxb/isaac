@@ -1,4 +1,6 @@
 #include "raylib.h"
+#include "raymath.h"
+#include "math.h"
 
 enum Direction
 {
@@ -10,9 +12,10 @@ enum Direction
 
 struct Tear
 {
-    Vector2 tearPosition;
-    // Vector2 startPosition;
-    enum Direction tearDirection;
+    Vector2 position;
+    Vector2 startPosition;
+    enum Direction direction;
+	bool exists;
 };
 
 int main(void)
@@ -31,7 +34,7 @@ int main(void)
     const float tearSpeed = 5;
     const float tearOffset = 5;
     const float tearRadius = squareSize / 2;
-	// const float tearRange = 20;
+	const float tearRange = fmin(screenWidth, screenHeight) / 3;
     double lastTearTime = 0;
     unsigned int tearIndex = 0;
     struct Tear *spawnedTears = MemAlloc(sizeof(struct Tear) * allocatedTears);
@@ -70,29 +73,37 @@ int main(void)
 		{
 			if (IsKeyDown(KEY_RIGHT))
 			{
-				spawnedTears[tearIndex].tearPosition = (Vector2){squareCenter.x + tearOffset, squareCenter.y};
-				spawnedTears[tearIndex].tearDirection = RIGHT;
+				spawnedTears[tearIndex].position = (Vector2){squareCenter.x + tearOffset, squareCenter.y};
+				spawnedTears[tearIndex].startPosition = spawnedTears[tearIndex].position;
+				spawnedTears[tearIndex].direction = RIGHT;
+				spawnedTears[tearIndex].exists = 1;
 				++tearIndex;
 				lastTearTime = currentTime;
 			}
 			else if (IsKeyDown(KEY_LEFT))
 			{
-				spawnedTears[tearIndex].tearPosition = (Vector2){squareCenter.x - tearOffset, squareCenter.y};
-				spawnedTears[tearIndex].tearDirection = LEFT;
+				spawnedTears[tearIndex].position = (Vector2){squareCenter.x - tearOffset, squareCenter.y};
+				spawnedTears[tearIndex].startPosition = spawnedTears[tearIndex].position;
+				spawnedTears[tearIndex].direction = LEFT;
+				spawnedTears[tearIndex].exists = 1;
 				++tearIndex;
 				lastTearTime = currentTime;
 			}
 			else if (IsKeyDown(KEY_UP))
 			{
-				spawnedTears[tearIndex].tearPosition = (Vector2){squareCenter.x, squareCenter.y - tearOffset};
-				spawnedTears[tearIndex].tearDirection = UP;
+				spawnedTears[tearIndex].position = (Vector2){squareCenter.x, squareCenter.y - tearOffset};
+				spawnedTears[tearIndex].startPosition = spawnedTears[tearIndex].position;
+				spawnedTears[tearIndex].direction = UP;
+				spawnedTears[tearIndex].exists = 1;
 				++tearIndex;
 				lastTearTime = currentTime;
 			}
 			else if (IsKeyDown(KEY_DOWN))
 			{
-				spawnedTears[tearIndex].tearPosition = (Vector2){squareCenter.x, squareCenter.y + tearOffset};
-				spawnedTears[tearIndex].tearDirection = DOWN;
+				spawnedTears[tearIndex].position = (Vector2){squareCenter.x, squareCenter.y + tearOffset};
+				spawnedTears[tearIndex].startPosition = spawnedTears[tearIndex].position;
+				spawnedTears[tearIndex].direction = DOWN;
+				spawnedTears[tearIndex].exists = 1;
 				++tearIndex;
 				lastTearTime = currentTime;
 			}
@@ -101,19 +112,26 @@ int main(void)
         // Update tears positions
         for (unsigned int i = 0; i < tearIndex; ++i)
         {
-            switch (spawnedTears[i].tearDirection)
+			if (!spawnedTears[i].exists)
+				continue;
+			if (Vector2Distance(spawnedTears[i].position, spawnedTears[i].startPosition) >= tearRange)
+			{
+				spawnedTears[i].exists = 0;
+				continue;
+			}
+            switch (spawnedTears[i].direction)
             {
             case RIGHT:
-                spawnedTears[i].tearPosition.x += tearSpeed;
+                spawnedTears[i].position.x += tearSpeed;
                 break;
             case LEFT:
-                spawnedTears[i].tearPosition.x -= tearSpeed;
+                spawnedTears[i].position.x -= tearSpeed;
                 break;
             case UP:
-                spawnedTears[i].tearPosition.y -= tearSpeed;
+                spawnedTears[i].position.y -= tearSpeed;
                 break;
             case DOWN:
-                spawnedTears[i].tearPosition.y += tearSpeed;
+                spawnedTears[i].position.y += tearSpeed;
                 break;
             }
         }
@@ -127,7 +145,11 @@ int main(void)
         DrawRectangleV(squarePosition, squareDimensions, skin);
 
         for (unsigned int i = 0; i < tearIndex; ++i)
-            DrawCircleV(spawnedTears[i].tearPosition, tearRadius, BLUE);
+		{
+			if (!spawnedTears[i].exists)
+				continue;
+            DrawCircleV(spawnedTears[i].position, tearRadius, BLUE);
+		}
 
         EndDrawing();
     }
