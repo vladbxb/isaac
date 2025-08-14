@@ -26,8 +26,11 @@ int main(void)
     InitWindow(screenWidth, screenHeight, "isaac");
 
     float squareSize = 30;
-    Vector2 squarePosition = {(float)screenWidth / 2, (float)screenHeight / 2};
     Vector2 squareDimensions = {(float)squareSize, (float)squareSize};
+    Vector2 squarePosition = {(float)screenWidth / 2, (float)screenHeight / 2};
+    // Center origin point
+    squarePosition.x -= (float)squareDimensions.x / 2;
+    squarePosition.y -= (float)squareDimensions.y / 2;
 
     float tearRadius = squareSize / 2;
 
