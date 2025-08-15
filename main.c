@@ -18,6 +18,8 @@ struct Tear
 	bool exists;
 };
 
+Rectangle tilemap[4][4];
+
 int main(void)
 {
     const int screenWidth = 800;
@@ -40,6 +42,14 @@ int main(void)
     struct Tear *spawnedTears = MemAlloc(sizeof(struct Tear) * allocatedTears);
 
 	double currentTime;
+
+	for (unsigned int i = 0; i < 4; ++i)
+	{
+		for (unsigned int j = 0; j < 4; ++j)
+		{
+			tilemap[i][j] = (Rectangle){ 30 * i + 10, 30 * j + 10, 10, 10 };
+		}
+	}
 
 	// Init
     InitWindow(screenWidth, screenHeight, "isaac");
@@ -149,6 +159,14 @@ int main(void)
 			if (!spawnedTears[i].exists)
 				continue;
             DrawCircleV(spawnedTears[i].position, tearRadius, BLUE);
+		}
+
+		for (unsigned int i = 0; i < 4; ++i)
+		{
+			for (unsigned int j = 0; j < 4; ++j)
+			{
+				DrawRectangleRec(tilemap[i][j], MAROON);
+			}
 		}
 
         EndDrawing();
