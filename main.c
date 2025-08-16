@@ -1,6 +1,10 @@
+// TODO: remove this after debugging
+#include <stdio.h>
+
 #include "raylib.h"
 #include "raymath.h"
 #include "math.h"
+
 
 enum Direction
 {
@@ -18,6 +22,12 @@ struct Tear
 	bool exists;
 };
 
+struct Tile
+{
+	Rectangle rect;
+	Color color;
+	bool isSolid;
+};
 
 int main(void)
 {
@@ -32,6 +42,12 @@ int main(void)
 	// Square constants
 	const float squareSize = 30;
     const Vector2 squareDimensions = {(float)squareSize, (float)squareSize};
+    Vector2 squarePosition = {(float)screenWidth / 2, (float)screenHeight / 2};
+	Vector2 squareCenter;
+    // Start in the middle of the screen
+	squarePosition.x -= (float)squareDimensions.x / 2;
+    squarePosition.y -= (float)squareDimensions.y / 2;
+	Rectangle square = (Rectangle){ squarePosition.x, squarePosition.y, squareDimensions.x, squareDimensions.y };
 
 	// Tear constants
 	const int allocatedTears = 10000;
@@ -50,14 +66,19 @@ int main(void)
 	// TODO: Change tilesize in terms of window size and maybe add letterboxing
 	const int tileSize = 88;
 	const Color colors[21] = { DARKGRAY, MAROON, ORANGE, DARKGREEN, DARKBLUE, DARKPURPLE, DARKBROWN, GRAY, RED, GOLD, LIME, BLUE, VIOLET, BROWN, LIGHTGRAY, PINK, YELLOW, GREEN, SKYBLUE, PURPLE, BEIGE };
-	Rectangle tilemap[horizontalTiles][verticalTiles];
+	struct Tile tilemap[horizontalTiles][verticalTiles];
+
+	bool collision = false;
+	bool touchingSolid = false;
 
 	// Initialize tiles
 	for (unsigned int i = 0; i < horizontalTiles; ++i)
 	{
 		for (unsigned int j = 0; j < verticalTiles; ++j)
 		{
-			tilemap[i][j] = (Rectangle){ i * tileSize, j * tileSize, tileSize, tileSize };
+			tilemap[i][j].rect = (Rectangle){ i * tileSize, j * tileSize, tileSize, tileSize };
+			tilemap[i][j].color = colors[(i + j) % 21];
+			tilemap[i][j].isSolid = 1 ? (i + j) % 2 == 0 : 0;
 		}
 	}
 
@@ -68,11 +89,6 @@ int main(void)
     InitWindow(screenWidth, screenHeight, "isaac");
     SetTargetFPS(60);
 
-    Vector2 squarePosition = {(float)screenWidth / 2, (float)screenHeight / 2};
-	Vector2 squareCenter;
-    // Start in the middle of the screen
-	squarePosition.x -= (float)squareDimensions.x / 2;
-    squarePosition.y -= (float)squareDimensions.y / 2;
 
     // Main game loop
     while (!WindowShouldClose())
@@ -80,16 +96,16 @@ int main(void)
 		// Update
         // WASD movement
         if (IsKeyDown(KEY_D))
-            squarePosition.x += 2.0f;
+            square.x += 2.0f;
         if (IsKeyDown(KEY_A))
-            squarePosition.x -= 2.0f;
+            square.x -= 2.0f;
         if (IsKeyDown(KEY_W))
-            squarePosition.y -= 2.0f;
+            square.y -= 2.0f;
         if (IsKeyDown(KEY_S))
-            squarePosition.y += 2.0f;
+            square.y += 2.0f;
 
         currentTime = GetTime();
-		squareCenter = (Vector2){squarePosition.x + squareDimensions.x / 2, squarePosition.y + squareDimensions.y / 2};
+		squareCenter = (Vector2){square.x + squareDimensions.x / 2, square.y + squareDimensions.y / 2};
 
         // Tear spawning
         if (currentTime - lastTearTime >= tearCooldown)
@@ -159,6 +175,29 @@ int main(void)
             }
         }
 
+		// Check for tiles collision
+		// TODO: Add collision response for solid blocks
+		for (unsigned int i = 0; i < horizontalTiles; ++i)
+		{
+			for (unsigned int j = 0; j < verticalTiles; ++j)
+			{
+				collision = CheckCollisionRecs(square, tilemap[i][j].rect);
+				if (collision)
+				{
+					if (tilemap[i][j].isSolid && !touchingSolid)
+					{
+						touchingSolid = 1;
+						printf("Touched a solid block!\n");
+					}
+					else if (!tilemap[i][j].isSolid && touchingSolid)
+					{
+						touchingSolid = 0;
+						printf("Touched a transparent block!\n");
+					}
+				}
+			}
+		}
+
         // Draw
         BeginDrawing();
         ClearBackground(background);
@@ -167,13 +206,14 @@ int main(void)
 		{
 			for (unsigned int j = 0; j < verticalTiles; ++j)
 			{
-				DrawRectangleRec(tilemap[i][j], colors[(i + j) % 21]);
+				DrawRectangleRec(tilemap[i][j].rect, tilemap[i][j].color);
 			}
 		}
 
         DrawText("Move the square with WASD", 10, 10, 20, RAYWHITE);
         DrawText("Shoot tears with arrow keys", 10, 40, 20, RAYWHITE);
-        DrawRectangleV(squarePosition, squareDimensions, skin);
+        // DrawRectangleV(squarePosition, squareDimensions, skin);
+		DrawRectangleRec(square, skin);
 
         for (unsigned int i = 0; i < tearIndex; ++i)
 		{
