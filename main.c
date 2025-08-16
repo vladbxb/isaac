@@ -1,6 +1,3 @@
-// TODO: remove this after debugging
-#include <stdio.h>
-
 #include "raylib.h"
 #include "raymath.h"
 #include "math.h"
@@ -28,18 +25,22 @@ struct Tile
 	bool isSolid;
 };
 
+// TODO: Add different types of tiles
+
 int main(void)
 {
 	// Screen size constants
-	const int screenWidth = 792;
-	const int screenHeight = 440;
+	const int screenWidth = 780;
+	const int screenHeight = 420;
 
 	// Color constants
 	const Color skin = {255, 215, 156, 255};
-	const Color background = {84, 53, 30, 255};
+	// const Color background = {84, 53, 30, 255}; // dirt color
+	const Color background = BLACK;
 
 	// Square constants
 	const float squareSize = 30;
+	const float squareSpeed = 2.0f;
 	const Vector2 squareDimensions = {(float)squareSize, (float)squareSize};
 	Vector2 squarePosition = {(float)screenWidth / 2, (float)screenHeight / 2};
 	Vector2 squareCenter;
@@ -57,13 +58,18 @@ int main(void)
 	const float tearRange = fmin(screenWidth, screenHeight) / 3;
 	double lastTearTime = 0;
 	unsigned int tearIndex = 0;
+	unsigned int minOuterTileX;
+	unsigned int maxOuterTileX;
+	unsigned int minOuterTileY;
+	unsigned int maxOuterTileY;
+	// TODO: Find a way to dynamically allocate tears without a limit, allowing random access and removal
 	struct Tear *spawnedTears = MemAlloc(sizeof(struct Tear) * allocatedTears);
 
 	// Tilemap constants
-	const int horizontalTiles = 9;
-	const int verticalTiles = 5;
+	const int horizontalTiles = 13;
+	const int verticalTiles = 7;
 	// TODO: Change tilesize in terms of window size and maybe add letterboxing
-	const int tileSize = 88;
+	const int tileSize = 60;
 	const Color colors[21] = {DARKGRAY, MAROON, ORANGE, DARKGREEN, DARKBLUE, DARKPURPLE, DARKBROWN, GRAY, RED, GOLD, LIME, BLUE, VIOLET, BROWN, LIGHTGRAY, PINK, YELLOW, GREEN, SKYBLUE, PURPLE, BEIGE};
 	struct Tile tilemap[horizontalTiles][verticalTiles];
 
@@ -77,7 +83,9 @@ int main(void)
 		{
 			tilemap[i][j].rect = (Rectangle){i * tileSize, j * tileSize, tileSize, tileSize};
 			tilemap[i][j].color = colors[(i + j) % 21];
-			tilemap[i][j].isSolid = 1 ? (i + j) % 2 == 0 : 0;
+			// TODO: Remove this and make the corresponding tiles solid instead by their type, not their position (for example wall tiles)
+			// Make outer walls solid
+			tilemap[i][j].isSolid = 1 ? ((i == 0 || i == horizontalTiles - 1) || (j == 0 || j == verticalTiles - 1)) : 0;
 		}
 	}
 
@@ -93,13 +101,13 @@ int main(void)
 		// Update
 		// WASD movement
 		if (IsKeyDown(KEY_D))
-			square.x += 2.0f;
+			square.x += squareSpeed;
 		if (IsKeyDown(KEY_A))
-			square.x -= 2.0f;
+			square.x -= squareSpeed;
 		if (IsKeyDown(KEY_W))
-			square.y -= 2.0f;
+			square.y -= squareSpeed;
 		if (IsKeyDown(KEY_S))
-			square.y += 2.0f;
+			square.y += squareSpeed;
 
 		currentTime = GetTime();
 		squareCenter = (Vector2){square.x + squareDimensions.x / 2, square.y + squareDimensions.y / 2};
@@ -145,7 +153,7 @@ int main(void)
 			}
 		}
 
-		// Update tears positions
+		// Update tears positions and check for collisions
 		for (unsigned int i = 0; i < tearIndex; ++i)
 		{
 			if (!spawnedTears[i].exists)
@@ -154,6 +162,30 @@ int main(void)
 			{
 				spawnedTears[i].exists = 0;
 				continue;
+			}
+
+			// TODO: Reduce the number of divisions (maybe make the math faster with multiplications instead)
+			// Find the tile that the tear is currently on, accounting for overlaps
+			minOuterTileX = (int)((spawnedTears[i].position.x - tearRadius) / tileSize);
+			maxOuterTileX = (int)((spawnedTears[i].position.x + tearRadius) / tileSize);
+			minOuterTileY = (int)((spawnedTears[i].position.y - tearRadius) / tileSize);
+			maxOuterTileY = (int)((spawnedTears[i].position.y + tearRadius) / tileSize);
+			struct Tile* outerTile;
+			for (unsigned int j = minOuterTileX; j <= maxOuterTileX; ++j)
+			{
+				for (unsigned int k = minOuterTileY; k <= maxOuterTileY; ++k)
+				{
+					outerTile = &tilemap[j][k];
+					if (outerTile->isSolid)
+					{
+						bool collision = CheckCollisionCircleRec(spawnedTears[i].position, tearRadius, outerTile->rect);
+						if (collision)
+						{
+							spawnedTears[i].exists = 0;
+							continue;
+						}
+					}
+				}
 			}
 			switch (spawnedTears[i].direction)
 			{
@@ -189,7 +221,7 @@ int main(void)
 						else
 							square.x += overlap.width;
 					}
-					else
+					if (overlap.width > overlap.height)
 					{
 						if (square.y < tilemap[i][j].rect.y)
 							square.y -= overlap.height;
@@ -214,7 +246,6 @@ int main(void)
 
 		DrawText("Move the square with WASD", 10, 10, 20, RAYWHITE);
 		DrawText("Shoot tears with arrow keys", 10, 40, 20, RAYWHITE);
-		// DrawRectangleV(squarePosition, squareDimensions, skin);
 		DrawRectangleRec(square, skin);
 
 		for (unsigned int i = 0; i < tearIndex; ++i)
