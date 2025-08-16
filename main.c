@@ -18,19 +18,22 @@ struct Tear
 	bool exists;
 };
 
-Rectangle tilemap[4][4];
 
 int main(void)
 {
-    const int screenWidth = 800;
-    const int screenHeight = 450;
+	// Screen size constants
+    const int screenWidth = 792;
+    const int screenHeight = 440;
 
+	// Color constants
     const Color skin = {255, 215, 156, 255};
     const Color background = {84, 53, 30, 255};
 
+	// Square constants
 	const float squareSize = 30;
     const Vector2 squareDimensions = {(float)squareSize, (float)squareSize};
 
+	// Tear constants
 	const int allocatedTears = 10000;
     const double tearCooldown = 0.3;
     const float tearSpeed = 5;
@@ -41,15 +44,25 @@ int main(void)
     unsigned int tearIndex = 0;
     struct Tear *spawnedTears = MemAlloc(sizeof(struct Tear) * allocatedTears);
 
-	double currentTime;
+	// Tilemap constants
+	const int horizontalTiles = 9;
+	const int verticalTiles = 5;
+	// TODO: Change tilesize in terms of window size and maybe add letterboxing
+	const int tileSize = 88;
+	const Color colors[21] = { DARKGRAY, MAROON, ORANGE, DARKGREEN, DARKBLUE, DARKPURPLE, DARKBROWN, GRAY, RED, GOLD, LIME, BLUE, VIOLET, BROWN, LIGHTGRAY, PINK, YELLOW, GREEN, SKYBLUE, PURPLE, BEIGE };
+	Rectangle tilemap[horizontalTiles][verticalTiles];
 
-	for (unsigned int i = 0; i < 4; ++i)
+	// Initialize tiles
+	for (unsigned int i = 0; i < horizontalTiles; ++i)
 	{
-		for (unsigned int j = 0; j < 4; ++j)
+		for (unsigned int j = 0; j < verticalTiles; ++j)
 		{
-			tilemap[i][j] = (Rectangle){ 30 * i + 10, 30 * j + 10, 10, 10 };
+			tilemap[i][j] = (Rectangle){ i * tileSize, j * tileSize, tileSize, tileSize };
 		}
 	}
+
+	double currentTime;
+
 
 	// Init
     InitWindow(screenWidth, screenHeight, "isaac");
@@ -150,6 +163,14 @@ int main(void)
         BeginDrawing();
         ClearBackground(background);
 
+		for (unsigned int i = 0; i < horizontalTiles; ++i)
+		{
+			for (unsigned int j = 0; j < verticalTiles; ++j)
+			{
+				DrawRectangleRec(tilemap[i][j], colors[(i + j) % 21]);
+			}
+		}
+
         DrawText("Move the square with WASD", 10, 10, 20, RAYWHITE);
         DrawText("Shoot tears with arrow keys", 10, 40, 20, RAYWHITE);
         DrawRectangleV(squarePosition, squareDimensions, skin);
@@ -161,13 +182,6 @@ int main(void)
             DrawCircleV(spawnedTears[i].position, tearRadius, BLUE);
 		}
 
-		for (unsigned int i = 0; i < 4; ++i)
-		{
-			for (unsigned int j = 0; j < 4; ++j)
-			{
-				DrawRectangleRec(tilemap[i][j], MAROON);
-			}
-		}
 
         EndDrawing();
     }
