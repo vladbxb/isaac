@@ -2,6 +2,8 @@
 #include "raymath.h"
 #include "math.h"
 
+#define MAX_TEARS 128
+
 enum Direction
 {
 	UP,
@@ -10,21 +12,78 @@ enum Direction
 	LEFT
 };
 
-struct Tear
+typedef struct
 {
 	Vector2 position;
 	Vector2 startPosition;
 	enum Direction direction;
 	bool exists;
-};
+} Tear;
 
-struct Tile
+typedef struct
 {
 	Rectangle rect;
 	Color color;
 	bool isSolid;
-};
+} Tile;
 
+typedef struct
+{
+	int items[MAX_TEARS];
+	int head;
+	int tail;
+} TearQueue;
+
+void initTearQueue(TearQueue *q)
+{
+	q->head = -1;
+	q->tail = 0;
+}
+
+void enqueueTear(TearQueue *q, int val)
+{
+	q->items[q->tail] = val;
+	q->tail = (q->tail + 1) % MAX_TEARS;
+
+	if (q->tail == q->head)
+	{
+		q->head = (q->head + 1) % MAX_TEARS;
+	}
+}
+
+int dequeueTear(TearQueue *q)
+{
+	q->head = (q->head + 1) % MAX_TEARS;
+	int val = q->items[q->head];
+	return val;
+}
+
+void spawnTear(Tear *tears, Vector2 pos, enum Direction dir, TearQueue *q)
+{
+	int found = 0;
+	int aux;
+	for (int i = 0; i < MAX_TEARS; ++i)
+	{
+		if (!tears[i].exists)
+		{
+			tears[i].position = pos;
+			tears[i].startPosition = pos;
+			tears[i].direction = dir;
+			tears[i].exists = true;
+			found = 1;
+			enqueueTear(q, i);
+			break;
+		}
+	}
+	if (!found)
+	{
+		aux = dequeueTear(q);
+		tears[aux].position = pos;
+		tears[aux].startPosition = pos;
+		tears[aux].direction = dir;
+		enqueueTear(q, aux);
+	}
+}
 // TODO: Add different types of tiles
 
 int main(void)
@@ -50,28 +109,34 @@ int main(void)
 	Rectangle square = (Rectangle){squarePosition.x, squarePosition.y, squareDimensions.x, squareDimensions.y};
 
 	// Tear constants
-	const int allocatedTears = 10000;
 	const double tearCooldown = 0.3;
 	const float tearSpeed = 5;
 	const float tearOffset = 5;
 	const float tearRadius = squareSize / 2;
 	const float tearRange = fmin(screenWidth, screenHeight) / 3;
 	double lastTearTime = 0;
-	unsigned int tearIndex = 0;
 	unsigned int minOuterTileX;
 	unsigned int maxOuterTileX;
 	unsigned int minOuterTileY;
 	unsigned int maxOuterTileY;
-	// TODO: Find a way to dynamically allocate tears without a limit, allowing random access and removal
-	struct Tear *spawnedTears = MemAlloc(sizeof(struct Tear) * allocatedTears);
+
+	// Tear array
+	Tear tears[MAX_TEARS];
+	for (int i = 0; i < MAX_TEARS; ++i)
+		tears[i].exists = false;
+
+	// Queue for remembering the oldest spawned tear
+	TearQueue tearQueue;
+	initTearQueue(&tearQueue);
 
 	// Tilemap constants
 	const int horizontalTiles = 13;
 	const int verticalTiles = 7;
+
 	// TODO: Change tilesize in terms of window size and maybe add letterboxing
 	const int tileSize = 60;
 	const Color colors[21] = {DARKGRAY, MAROON, ORANGE, DARKGREEN, DARKBLUE, DARKPURPLE, DARKBROWN, GRAY, RED, GOLD, LIME, BLUE, VIOLET, BROWN, LIGHTGRAY, PINK, YELLOW, GREEN, SKYBLUE, PURPLE, BEIGE};
-	struct Tile tilemap[horizontalTiles][verticalTiles];
+	Tile tilemap[horizontalTiles][verticalTiles];
 
 	bool collision = false;
 	bool touchingSolid = false;
@@ -117,60 +182,44 @@ int main(void)
 		{
 			if (IsKeyDown(KEY_RIGHT))
 			{
-				spawnedTears[tearIndex].position = (Vector2){squareCenter.x + tearOffset, squareCenter.y};
-				spawnedTears[tearIndex].startPosition = spawnedTears[tearIndex].position;
-				spawnedTears[tearIndex].direction = RIGHT;
-				spawnedTears[tearIndex].exists = 1;
-				++tearIndex;
+				spawnTear(tears, (Vector2){squareCenter.x + tearOffset, squareCenter.y}, RIGHT, &tearQueue);
 				lastTearTime = currentTime;
 			}
 			else if (IsKeyDown(KEY_LEFT))
 			{
-				spawnedTears[tearIndex].position = (Vector2){squareCenter.x - tearOffset, squareCenter.y};
-				spawnedTears[tearIndex].startPosition = spawnedTears[tearIndex].position;
-				spawnedTears[tearIndex].direction = LEFT;
-				spawnedTears[tearIndex].exists = 1;
-				++tearIndex;
+				spawnTear(tears, (Vector2){squareCenter.x - tearOffset, squareCenter.y}, LEFT, &tearQueue);
 				lastTearTime = currentTime;
 			}
 			else if (IsKeyDown(KEY_UP))
 			{
-				spawnedTears[tearIndex].position = (Vector2){squareCenter.x, squareCenter.y - tearOffset};
-				spawnedTears[tearIndex].startPosition = spawnedTears[tearIndex].position;
-				spawnedTears[tearIndex].direction = UP;
-				spawnedTears[tearIndex].exists = 1;
-				++tearIndex;
+				spawnTear(tears, (Vector2){squareCenter.x, squareCenter.y - tearOffset}, UP, &tearQueue);
 				lastTearTime = currentTime;
 			}
 			else if (IsKeyDown(KEY_DOWN))
 			{
-				spawnedTears[tearIndex].position = (Vector2){squareCenter.x, squareCenter.y + tearOffset};
-				spawnedTears[tearIndex].startPosition = spawnedTears[tearIndex].position;
-				spawnedTears[tearIndex].direction = DOWN;
-				spawnedTears[tearIndex].exists = 1;
-				++tearIndex;
+				spawnTear(tears, (Vector2){squareCenter.x, squareCenter.y + tearOffset}, DOWN, &tearQueue);
 				lastTearTime = currentTime;
 			}
 		}
 
 		// Update tears positions and check for collisions
-		for (unsigned int i = 0; i < tearIndex; ++i)
+		for (unsigned int i = 0; i < MAX_TEARS; ++i)
 		{
-			if (!spawnedTears[i].exists)
+			if (!tears[i].exists)
 				continue;
-			if (Vector2Distance(spawnedTears[i].position, spawnedTears[i].startPosition) >= tearRange)
+			if (Vector2Distance(tears[i].position, tears[i].startPosition) >= tearRange)
 			{
-				spawnedTears[i].exists = 0;
+				tears[i].exists = 0;
 				continue;
 			}
 
 			// TODO: Reduce the number of divisions (maybe make the math faster with multiplications instead)
 			// Find the tile that the tear is currently on, accounting for overlaps
-			minOuterTileX = (int)((spawnedTears[i].position.x - tearRadius) / tileSize);
-			maxOuterTileX = (int)((spawnedTears[i].position.x + tearRadius) / tileSize);
-			minOuterTileY = (int)((spawnedTears[i].position.y - tearRadius) / tileSize);
-			maxOuterTileY = (int)((spawnedTears[i].position.y + tearRadius) / tileSize);
-			struct Tile* outerTile;
+			minOuterTileX = (int)((tears[i].position.x - tearRadius) / tileSize);
+			maxOuterTileX = (int)((tears[i].position.x + tearRadius) / tileSize);
+			minOuterTileY = (int)((tears[i].position.y - tearRadius) / tileSize);
+			maxOuterTileY = (int)((tears[i].position.y + tearRadius) / tileSize);
+			Tile *outerTile;
 			for (unsigned int j = minOuterTileX; j <= maxOuterTileX; ++j)
 			{
 				for (unsigned int k = minOuterTileY; k <= maxOuterTileY; ++k)
@@ -178,28 +227,28 @@ int main(void)
 					outerTile = &tilemap[j][k];
 					if (outerTile->isSolid)
 					{
-						bool collision = CheckCollisionCircleRec(spawnedTears[i].position, tearRadius, outerTile->rect);
+						bool collision = CheckCollisionCircleRec(tears[i].position, tearRadius, outerTile->rect);
 						if (collision)
 						{
-							spawnedTears[i].exists = 0;
+							tears[i].exists = 0;
 							continue;
 						}
 					}
 				}
 			}
-			switch (spawnedTears[i].direction)
+			switch (tears[i].direction)
 			{
 			case RIGHT:
-				spawnedTears[i].position.x += tearSpeed;
+				tears[i].position.x += tearSpeed;
 				break;
 			case LEFT:
-				spawnedTears[i].position.x -= tearSpeed;
+				tears[i].position.x -= tearSpeed;
 				break;
 			case UP:
-				spawnedTears[i].position.y -= tearSpeed;
+				tears[i].position.y -= tearSpeed;
 				break;
 			case DOWN:
-				spawnedTears[i].position.y += tearSpeed;
+				tears[i].position.y += tearSpeed;
 				break;
 			}
 		}
@@ -248,11 +297,11 @@ int main(void)
 		DrawText("Shoot tears with arrow keys", 10, 40, 20, RAYWHITE);
 		DrawRectangleRec(square, skin);
 
-		for (unsigned int i = 0; i < tearIndex; ++i)
+		for (unsigned int i = 0; i < MAX_TEARS; ++i)
 		{
-			if (!spawnedTears[i].exists)
+			if (!tears[i].exists)
 				continue;
-			DrawCircleV(spawnedTears[i].position, tearRadius, BLUE);
+			DrawCircleV(tears[i].position, tearRadius, BLUE);
 		}
 
 		EndDrawing();
