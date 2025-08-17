@@ -12,6 +12,39 @@ enum Direction
 	LEFT
 };
 
+typedef enum
+{
+	WALL,
+	FIRE,
+	POOP,
+	EMPTY,
+	DOOR
+} TileType;
+
+typedef union
+{
+	struct
+	{
+		int hitsLeft;
+		int damage;
+
+	} fire;
+	struct
+	{
+		int hitsLeft;
+	} poop;
+
+} TileData;
+
+typedef struct
+{
+	Rectangle rect;
+	Color color;
+	bool isSolid;
+	TileType type;
+	TileData data;
+} Tile;
+
 typedef struct
 {
 	Vector2 position;
@@ -19,13 +52,6 @@ typedef struct
 	enum Direction direction;
 	bool exists;
 } Tear;
-
-typedef struct
-{
-	Rectangle rect;
-	Color color;
-	bool isSolid;
-} Tile;
 
 typedef struct
 {
@@ -135,22 +161,65 @@ int main(void)
 
 	// TODO: Change tilesize in terms of window size and maybe add letterboxing
 	const int tileSize = 60;
-	const Color colors[21] = {DARKGRAY, MAROON, ORANGE, DARKGREEN, DARKBLUE, DARKPURPLE, DARKBROWN, GRAY, RED, GOLD, LIME, BLUE, VIOLET, BROWN, LIGHTGRAY, PINK, YELLOW, GREEN, SKYBLUE, PURPLE, BEIGE};
+	// const Color colors[21] = {DARKGRAY, MAROON, ORANGE, DARKGREEN, DARKBLUE, DARKPURPLE, DARKBROWN, GRAY, RED, GOLD, LIME, BLUE, VIOLET, BROWN, LIGHTGRAY, PINK, YELLOW, GREEN, SKYBLUE, PURPLE, BEIGE};
 	Tile tilemap[horizontalTiles][verticalTiles];
 
 	bool collision = false;
 	bool touchingSolid = false;
+
+	// Tile constants
+	const Tile WALL_TILE = {
+		.rect = {0, 0, 60, 60},
+		.color = DARKGRAY,
+		.isSolid = true,
+		.type = WALL};
+
+	const Tile EMPTY_TILE = {
+		.rect = {0, 0, 60, 60},
+		.color = WHITE,
+		.isSolid = false,
+		.type = EMPTY};
+
+	const Tile DOOR_TILE = {
+		.rect = {0, 0, 60, 60},
+		.color = BROWN,
+		.isSolid = false,
+		.type = DOOR};
+
+	const Tile FIRE_TILE = {
+		.rect = {0, 0, 60, 60},
+		.color = RED,
+		.isSolid = true,
+		.type = FIRE,
+		.data.fire = {.hitsLeft = 3, .damage = 1}};
+
+	const Tile POOP_TILE = {
+		.rect = {0, 0, 60, 60},
+		.color = BROWN,
+		.isSolid = true,
+		.type = POOP,
+		.data.poop = {.hitsLeft = 3}};
 
 	// Initialize tiles
 	for (unsigned int i = 0; i < horizontalTiles; ++i)
 	{
 		for (unsigned int j = 0; j < verticalTiles; ++j)
 		{
+			if ((j == 3 && (i == 0 || i == horizontalTiles - 1)) || (i == 6 && (j == 0 || j == verticalTiles - 1)))
+			{
+				tilemap[i][j] = DOOR_TILE;
+			}
+			else if (i == 0 || i == horizontalTiles - 1 || j == 0 || j == verticalTiles - 1)
+			{
+				tilemap[i][j] = WALL_TILE;
+			}
+			else
+			{
+				tilemap[i][j] = EMPTY_TILE;
+			}
+			if (i == 7 && j == 3)
+				tilemap[i][j] = POOP_TILE;
 			tilemap[i][j].rect = (Rectangle){i * tileSize, j * tileSize, tileSize, tileSize};
-			tilemap[i][j].color = colors[(i + j) % 21];
-			// TODO: Remove this and make the corresponding tiles solid instead by their type, not their position (for example wall tiles)
-			// Make outer walls solid
-			tilemap[i][j].isSolid = 1 ? ((i == 0 || i == horizontalTiles - 1) || (j == 0 || j == verticalTiles - 1)) : 0;
 		}
 	}
 
@@ -231,6 +300,15 @@ int main(void)
 						if (collision)
 						{
 							tears[i].exists = 0;
+							if (outerTile->type == POOP)
+							{
+								outerTile->data.poop.hitsLeft--;
+								if (outerTile->data.poop.hitsLeft == 0)
+								{
+									outerTile->color = WHITE;
+									outerTile->isSolid = false;
+								}
+							}
 							continue;
 						}
 					}
