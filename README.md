@@ -8,7 +8,7 @@ In the project's directory, run this command to compile the game with gcc:
 ```sh
 gcc main.c -o bin/main -lraylib -lm -ldl -lpthread -lGL
 ```
-This works on both Xorg and Wayland from our testing.
+This works on both Xorg and Wayland.
 ### On macOS
 [Follow installation with Homebrew](https://github.com/raysan5/raylib/wiki/Working-on-macOS#with-homebrew). Then, in the project's directory, run this command to compile the game with Xcode's cc. **For this, you might need to have Xcode developer tools installed**.
 ```sh
