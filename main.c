@@ -1,90 +1,9 @@
-#include "raylib.h"
-#include "raymath.h"
-#include "math.h"
-
-#define MAX_TEARS 128
-
-enum Direction
-{
-	UP,
-	RIGHT,
-	DOWN,
-	LEFT
-};
-
-typedef struct
-{
-	Vector2 position;
-	Vector2 startPosition;
-	enum Direction direction;
-	bool exists;
-} Tear;
-
-typedef struct
-{
-	Rectangle rect;
-	Color color;
-	bool isSolid;
-} Tile;
-
-typedef struct
-{
-	int items[MAX_TEARS];
-	int head;
-	int tail;
-} TearQueue;
-
-void initTearQueue(TearQueue *q)
-{
-	q->head = -1;
-	q->tail = 0;
-}
-
-void enqueueTear(TearQueue *q, int val)
-{
-	q->items[q->tail] = val;
-	q->tail = (q->tail + 1) % MAX_TEARS;
-
-	if (q->tail == q->head)
-	{
-		q->head = (q->head + 1) % MAX_TEARS;
-	}
-}
-
-int dequeueTear(TearQueue *q)
-{
-	q->head = (q->head + 1) % MAX_TEARS;
-	int val = q->items[q->head];
-	return val;
-}
-
-void spawnTear(Tear *tears, Vector2 pos, enum Direction dir, TearQueue *q)
-{
-	int found = 0;
-	int aux;
-	for (int i = 0; i < MAX_TEARS; ++i)
-	{
-		if (!tears[i].exists)
-		{
-			tears[i].position = pos;
-			tears[i].startPosition = pos;
-			tears[i].direction = dir;
-			tears[i].exists = true;
-			found = 1;
-			enqueueTear(q, i);
-			break;
-		}
-	}
-	if (!found)
-	{
-		aux = dequeueTear(q);
-		tears[aux].position = pos;
-		tears[aux].startPosition = pos;
-		tears[aux].direction = dir;
-		enqueueTear(q, aux);
-	}
-}
-// TODO: Add different types of tiles
+#include <math.h>
+#include <raylib.h>
+#include <raymath.h>
+#include "tear.h"
+#include "tile.h"
+#include "movement.h"
 
 int main(void)
 {
@@ -135,22 +54,65 @@ int main(void)
 
 	// TODO: Change tilesize in terms of window size and maybe add letterboxing
 	const int tileSize = 60;
-	const Color colors[21] = {DARKGRAY, MAROON, ORANGE, DARKGREEN, DARKBLUE, DARKPURPLE, DARKBROWN, GRAY, RED, GOLD, LIME, BLUE, VIOLET, BROWN, LIGHTGRAY, PINK, YELLOW, GREEN, SKYBLUE, PURPLE, BEIGE};
+	// const Color colors[21] = {DARKGRAY, MAROON, ORANGE, DARKGREEN, DARKBLUE, DARKPURPLE, DARKBROWN, GRAY, RED, GOLD, LIME, BLUE, VIOLET, BROWN, LIGHTGRAY, PINK, YELLOW, GREEN, SKYBLUE, PURPLE, BEIGE};
 	Tile tilemap[horizontalTiles][verticalTiles];
 
 	bool collision = false;
 	bool touchingSolid = false;
+
+	// Tile constants
+	const Tile WALL_TILE = {
+		.rect = {0, 0, 60, 60},
+		.color = DARKGRAY,
+		.isSolid = true,
+		.type = WALL};
+
+	const Tile EMPTY_TILE = {
+		.rect = {0, 0, 60, 60},
+		.color = WHITE,
+		.isSolid = false,
+		.type = EMPTY};
+
+	const Tile DOOR_TILE = {
+		.rect = {0, 0, 60, 60},
+		.color = BROWN,
+		.isSolid = false,
+		.type = DOOR};
+
+	const Tile FIRE_TILE = {
+		.rect = {0, 0, 60, 60},
+		.color = RED,
+		.isSolid = true,
+		.type = FIRE,
+		.data.fire = {.hitsLeft = 3, .damage = 1}};
+
+	const Tile POOP_TILE = {
+		.rect = {0, 0, 60, 60},
+		.color = BROWN,
+		.isSolid = true,
+		.type = POOP,
+		.data.poop = {.hitsLeft = 3}};
 
 	// Initialize tiles
 	for (unsigned int i = 0; i < horizontalTiles; ++i)
 	{
 		for (unsigned int j = 0; j < verticalTiles; ++j)
 		{
+			if ((j == 3 && (i == 0 || i == horizontalTiles - 1)) || (i == 6 && (j == 0 || j == verticalTiles - 1)))
+			{
+				tilemap[i][j] = DOOR_TILE;
+			}
+			else if (i == 0 || i == horizontalTiles - 1 || j == 0 || j == verticalTiles - 1)
+			{
+				tilemap[i][j] = WALL_TILE;
+			}
+			else
+			{
+				tilemap[i][j] = EMPTY_TILE;
+			}
+			if (i == 7 && j == 3)
+				tilemap[i][j] = POOP_TILE;
 			tilemap[i][j].rect = (Rectangle){i * tileSize, j * tileSize, tileSize, tileSize};
-			tilemap[i][j].color = colors[(i + j) % 21];
-			// TODO: Remove this and make the corresponding tiles solid instead by their type, not their position (for example wall tiles)
-			// Make outer walls solid
-			tilemap[i][j].isSolid = 1 ? ((i == 0 || i == horizontalTiles - 1) || (j == 0 || j == verticalTiles - 1)) : 0;
 		}
 	}
 
@@ -231,6 +193,15 @@ int main(void)
 						if (collision)
 						{
 							tears[i].exists = 0;
+							if (outerTile->type == POOP)
+							{
+								outerTile->data.poop.hitsLeft--;
+								if (outerTile->data.poop.hitsLeft == 0)
+								{
+									outerTile->color = WHITE;
+									outerTile->isSolid = false;
+								}
+							}
 							continue;
 						}
 					}
