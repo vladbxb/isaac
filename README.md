@@ -6,7 +6,7 @@ This is a simple fan recreation of The Binding of Isaac made for fun, in C!
 [Install the dependencies. Then install the raylib package on your package manager or build from source.](https://github.com/raysan5/raylib/wiki/Working-on-GNU-Linux).
 In the project's directory, run this command to compile the game with gcc:
 ```sh
-gcc main.c -o bin/main -lraylib -lm -ldl -lpthread -lGL
+gcc main.c tear.c -o bin/main -lraylib -lm -ldl -lpthread -lGL -lX11
 ```
 This works on both Xorg and Wayland.
 ### On macOS

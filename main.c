@@ -1,159 +1,283 @@
-#include "raylib.h"
-#include "raymath.h"
-#include "math.h"
-
-enum Direction
-{
-    UP,
-    RIGHT,
-    DOWN,
-    LEFT
-};
-
-struct Tear
-{
-    Vector2 position;
-    Vector2 startPosition;
-    enum Direction direction;
-	bool exists;
-};
+#include <math.h>
+#include <raylib.h>
+#include <raymath.h>
+#include "tear.h"
+#include "tile.h"
+#include "movement.h"
 
 int main(void)
 {
-    const int screenWidth = 800;
-    const int screenHeight = 450;
+	// Screen size constants
+	const int screenWidth = 780;
+	const int screenHeight = 420;
 
-    const Color skin = {255, 215, 156, 255};
-    const Color background = {84, 53, 30, 255};
+	// Color constants
+	const Color skin = {255, 215, 156, 255};
+	// const Color background = {84, 53, 30, 255}; // dirt color
+	const Color background = BLACK;
 
+	// Square constants
 	const float squareSize = 30;
-    const Vector2 squareDimensions = {(float)squareSize, (float)squareSize};
+	const float squareSpeed = 2.0f;
+	const Vector2 squareDimensions = {(float)squareSize, (float)squareSize};
+	Vector2 squarePosition = {(float)screenWidth / 2, (float)screenHeight / 2};
+	Vector2 squareCenter;
+	// Start in the middle of the screen
+	squarePosition.x -= (float)squareDimensions.x / 2;
+	squarePosition.y -= (float)squareDimensions.y / 2;
+	Rectangle square = (Rectangle){squarePosition.x, squarePosition.y, squareDimensions.x, squareDimensions.y};
 
-	const int allocatedTears = 10000;
-    const double tearCooldown = 0.3;
-    const float tearSpeed = 5;
-    const float tearOffset = 5;
-    const float tearRadius = squareSize / 2;
+	// Tear constants
+	const double tearCooldown = 0.3;
+	const float tearSpeed = 5;
+	const float tearOffset = 5;
+	const float tearRadius = squareSize / 2;
 	const float tearRange = fmin(screenWidth, screenHeight) / 3;
-    double lastTearTime = 0;
-    unsigned int tearIndex = 0;
-    struct Tear *spawnedTears = MemAlloc(sizeof(struct Tear) * allocatedTears);
+	double lastTearTime = 0;
+	unsigned int minOuterTileX;
+	unsigned int maxOuterTileX;
+	unsigned int minOuterTileY;
+	unsigned int maxOuterTileY;
+
+	// Tear array
+	Tear tears[MAX_TEARS];
+	for (int i = 0; i < MAX_TEARS; ++i)
+		tears[i].exists = false;
+
+	// Queue for remembering the oldest spawned tear
+	TearQueue tearQueue;
+	initTearQueue(&tearQueue);
+
+	// Tilemap constants
+	const int horizontalTiles = 13;
+	const int verticalTiles = 7;
+
+	// TODO: Change tilesize in terms of window size and maybe add letterboxing
+	const int tileSize = 60;
+	// const Color colors[21] = {DARKGRAY, MAROON, ORANGE, DARKGREEN, DARKBLUE, DARKPURPLE, DARKBROWN, GRAY, RED, GOLD, LIME, BLUE, VIOLET, BROWN, LIGHTGRAY, PINK, YELLOW, GREEN, SKYBLUE, PURPLE, BEIGE};
+	Tile tilemap[horizontalTiles][verticalTiles];
+
+	bool collision = false;
+	bool touchingSolid = false;
+
+	// Tile constants
+	const Tile WALL_TILE = {
+		.rect = {0, 0, 60, 60},
+		.color = DARKGRAY,
+		.isSolid = true,
+		.type = WALL};
+
+	const Tile EMPTY_TILE = {
+		.rect = {0, 0, 60, 60},
+		.color = WHITE,
+		.isSolid = false,
+		.type = EMPTY};
+
+	const Tile DOOR_TILE = {
+		.rect = {0, 0, 60, 60},
+		.color = BROWN,
+		.isSolid = false,
+		.type = DOOR};
+
+	const Tile FIRE_TILE = {
+		.rect = {0, 0, 60, 60},
+		.color = RED,
+		.isSolid = true,
+		.type = FIRE,
+		.data.fire = {.hitsLeft = 3, .damage = 1}};
+
+	const Tile POOP_TILE = {
+		.rect = {0, 0, 60, 60},
+		.color = BROWN,
+		.isSolid = true,
+		.type = POOP,
+		.data.poop = {.hitsLeft = 3}};
+
+	// Initialize tiles
+	for (unsigned int i = 0; i < horizontalTiles; ++i)
+	{
+		for (unsigned int j = 0; j < verticalTiles; ++j)
+		{
+			if ((j == 3 && (i == 0 || i == horizontalTiles - 1)) || (i == 6 && (j == 0 || j == verticalTiles - 1)))
+			{
+				tilemap[i][j] = DOOR_TILE;
+			}
+			else if (i == 0 || i == horizontalTiles - 1 || j == 0 || j == verticalTiles - 1)
+			{
+				tilemap[i][j] = WALL_TILE;
+			}
+			else
+			{
+				tilemap[i][j] = EMPTY_TILE;
+			}
+			if (i == 7 && j == 3)
+				tilemap[i][j] = POOP_TILE;
+			tilemap[i][j].rect = (Rectangle){i * tileSize, j * tileSize, tileSize, tileSize};
+		}
+	}
 
 	double currentTime;
 
 	// Init
-    InitWindow(screenWidth, screenHeight, "isaac");
-    SetTargetFPS(60);
+	InitWindow(screenWidth, screenHeight, "isaac");
+	SetTargetFPS(60);
 
-    Vector2 squarePosition = {(float)screenWidth / 2, (float)screenHeight / 2};
-	Vector2 squareCenter;
-    // Start in the middle of the screen
-	squarePosition.x -= (float)squareDimensions.x / 2;
-    squarePosition.y -= (float)squareDimensions.y / 2;
-
-    // Main game loop
-    while (!WindowShouldClose())
-    {
+	// Main game loop
+	while (!WindowShouldClose())
+	{
 		// Update
-        // WASD movement
-        if (IsKeyDown(KEY_D))
-            squarePosition.x += 2.0f;
-        if (IsKeyDown(KEY_A))
-            squarePosition.x -= 2.0f;
-        if (IsKeyDown(KEY_W))
-            squarePosition.y -= 2.0f;
-        if (IsKeyDown(KEY_S))
-            squarePosition.y += 2.0f;
+		// WASD movement
+		if (IsKeyDown(KEY_D))
+			square.x += squareSpeed;
+		if (IsKeyDown(KEY_A))
+			square.x -= squareSpeed;
+		if (IsKeyDown(KEY_W))
+			square.y -= squareSpeed;
+		if (IsKeyDown(KEY_S))
+			square.y += squareSpeed;
 
-        currentTime = GetTime();
-		squareCenter = (Vector2){squarePosition.x + squareDimensions.x / 2, squarePosition.y + squareDimensions.y / 2};
+		currentTime = GetTime();
+		squareCenter = (Vector2){square.x + squareDimensions.x / 2, square.y + squareDimensions.y / 2};
 
-        // Tear spawning
-        if (currentTime - lastTearTime >= tearCooldown)
+		// Tear spawning
+		if (currentTime - lastTearTime >= tearCooldown)
 		{
 			if (IsKeyDown(KEY_RIGHT))
 			{
-				spawnedTears[tearIndex].position = (Vector2){squareCenter.x + tearOffset, squareCenter.y};
-				spawnedTears[tearIndex].startPosition = spawnedTears[tearIndex].position;
-				spawnedTears[tearIndex].direction = RIGHT;
-				spawnedTears[tearIndex].exists = 1;
-				++tearIndex;
+				spawnTear(tears, (Vector2){squareCenter.x + tearOffset, squareCenter.y}, RIGHT, &tearQueue);
 				lastTearTime = currentTime;
 			}
 			else if (IsKeyDown(KEY_LEFT))
 			{
-				spawnedTears[tearIndex].position = (Vector2){squareCenter.x - tearOffset, squareCenter.y};
-				spawnedTears[tearIndex].startPosition = spawnedTears[tearIndex].position;
-				spawnedTears[tearIndex].direction = LEFT;
-				spawnedTears[tearIndex].exists = 1;
-				++tearIndex;
+				spawnTear(tears, (Vector2){squareCenter.x - tearOffset, squareCenter.y}, LEFT, &tearQueue);
 				lastTearTime = currentTime;
 			}
 			else if (IsKeyDown(KEY_UP))
 			{
-				spawnedTears[tearIndex].position = (Vector2){squareCenter.x, squareCenter.y - tearOffset};
-				spawnedTears[tearIndex].startPosition = spawnedTears[tearIndex].position;
-				spawnedTears[tearIndex].direction = UP;
-				spawnedTears[tearIndex].exists = 1;
-				++tearIndex;
+				spawnTear(tears, (Vector2){squareCenter.x, squareCenter.y - tearOffset}, UP, &tearQueue);
 				lastTearTime = currentTime;
 			}
 			else if (IsKeyDown(KEY_DOWN))
 			{
-				spawnedTears[tearIndex].position = (Vector2){squareCenter.x, squareCenter.y + tearOffset};
-				spawnedTears[tearIndex].startPosition = spawnedTears[tearIndex].position;
-				spawnedTears[tearIndex].direction = DOWN;
-				spawnedTears[tearIndex].exists = 1;
-				++tearIndex;
+				spawnTear(tears, (Vector2){squareCenter.x, squareCenter.y + tearOffset}, DOWN, &tearQueue);
 				lastTearTime = currentTime;
 			}
 		}
 
-        // Update tears positions
-        for (unsigned int i = 0; i < tearIndex; ++i)
-        {
-			if (!spawnedTears[i].exists)
+		// Update tears positions and check for collisions
+		for (unsigned int i = 0; i < MAX_TEARS; ++i)
+		{
+			if (!tears[i].exists)
 				continue;
-			if (Vector2Distance(spawnedTears[i].position, spawnedTears[i].startPosition) >= tearRange)
+			if (Vector2Distance(tears[i].position, tears[i].startPosition) >= tearRange)
 			{
-				spawnedTears[i].exists = 0;
+				tears[i].exists = 0;
 				continue;
 			}
-            switch (spawnedTears[i].direction)
-            {
-            case RIGHT:
-                spawnedTears[i].position.x += tearSpeed;
-                break;
-            case LEFT:
-                spawnedTears[i].position.x -= tearSpeed;
-                break;
-            case UP:
-                spawnedTears[i].position.y -= tearSpeed;
-                break;
-            case DOWN:
-                spawnedTears[i].position.y += tearSpeed;
-                break;
-            }
-        }
 
-        // Draw
-        BeginDrawing();
-        ClearBackground(background);
-
-        DrawText("Move the square with WASD", 10, 10, 20, RAYWHITE);
-        DrawText("Shoot tears with arrow keys", 10, 40, 20, RAYWHITE);
-        DrawRectangleV(squarePosition, squareDimensions, skin);
-
-        for (unsigned int i = 0; i < tearIndex; ++i)
-		{
-			if (!spawnedTears[i].exists)
-				continue;
-            DrawCircleV(spawnedTears[i].position, tearRadius, BLUE);
+			// TODO: Reduce the number of divisions (maybe make the math faster with multiplications instead)
+			// Find the tile that the tear is currently on, accounting for overlaps
+			minOuterTileX = (int)((tears[i].position.x - tearRadius) / tileSize);
+			maxOuterTileX = (int)((tears[i].position.x + tearRadius) / tileSize);
+			minOuterTileY = (int)((tears[i].position.y - tearRadius) / tileSize);
+			maxOuterTileY = (int)((tears[i].position.y + tearRadius) / tileSize);
+			Tile *outerTile;
+			for (unsigned int j = minOuterTileX; j <= maxOuterTileX; ++j)
+			{
+				for (unsigned int k = minOuterTileY; k <= maxOuterTileY; ++k)
+				{
+					outerTile = &tilemap[j][k];
+					if (outerTile->isSolid)
+					{
+						bool collision = CheckCollisionCircleRec(tears[i].position, tearRadius, outerTile->rect);
+						if (collision)
+						{
+							tears[i].exists = 0;
+							if (outerTile->type == POOP)
+							{
+								outerTile->data.poop.hitsLeft--;
+								if (outerTile->data.poop.hitsLeft == 0)
+								{
+									outerTile->color = WHITE;
+									outerTile->isSolid = false;
+								}
+							}
+							continue;
+						}
+					}
+				}
+			}
+			switch (tears[i].direction)
+			{
+			case RIGHT:
+				tears[i].position.x += tearSpeed;
+				break;
+			case LEFT:
+				tears[i].position.x -= tearSpeed;
+				break;
+			case UP:
+				tears[i].position.y -= tearSpeed;
+				break;
+			case DOWN:
+				tears[i].position.y += tearSpeed;
+				break;
+			}
 		}
 
-        EndDrawing();
-    }
+		// Check for tiles collision
+		for (unsigned int i = 0; i < horizontalTiles; ++i)
+		{
+			for (unsigned int j = 0; j < verticalTiles; ++j)
+			{
+				collision = CheckCollisionRecs(square, tilemap[i][j].rect);
+				if (collision && tilemap[i][j].isSolid)
+				{
+					Rectangle overlap = GetCollisionRec(square, tilemap[i][j].rect);
 
-    CloseWindow();
-    return 0;
+					if (overlap.width < overlap.height)
+					{
+						if (square.x < tilemap[i][j].rect.x)
+							square.x -= overlap.width;
+						else
+							square.x += overlap.width;
+					}
+					if (overlap.width > overlap.height)
+					{
+						if (square.y < tilemap[i][j].rect.y)
+							square.y -= overlap.height;
+						else
+							square.y += overlap.height;
+					}
+				}
+			}
+		}
+
+		// Draw
+		BeginDrawing();
+		ClearBackground(background);
+
+		for (unsigned int i = 0; i < horizontalTiles; ++i)
+		{
+			for (unsigned int j = 0; j < verticalTiles; ++j)
+			{
+				DrawRectangleRec(tilemap[i][j].rect, tilemap[i][j].color);
+			}
+		}
+
+		DrawText("Move the square with WASD", 10, 10, 20, RAYWHITE);
+		DrawText("Shoot tears with arrow keys", 10, 40, 20, RAYWHITE);
+		DrawRectangleRec(square, skin);
+
+		for (unsigned int i = 0; i < MAX_TEARS; ++i)
+		{
+			if (!tears[i].exists)
+				continue;
+			DrawCircleV(tears[i].position, tearRadius, BLUE);
+		}
+
+		EndDrawing();
+	}
+
+	CloseWindow();
+	return 0;
 }
